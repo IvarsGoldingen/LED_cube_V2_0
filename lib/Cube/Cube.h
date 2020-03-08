@@ -2,7 +2,7 @@
  * Cube.h
  * Library for controlling a 4x4x4 LED cube with 2 shift registers
  *  
- *  LED numbers
+ *  LED numbers when looking at the cobe from the front
  *  [15]  [14]  [13] [12]
  *  [11]  [10]  [9]  [8]
  *  [7]   [6]   [5]  [4]
@@ -50,7 +50,24 @@
 #define SM2_ALL_LEDS 1 
 #define SM2_MIDDLE_LEDS 2 
 
+//fireworks animation steps
+#define FW_ST0_INIT 0
+#define FW_ST1_UP1 1
+#define FW_ST2_EXPLOSION 2
+#define FW_ST3_DOWN 3
 
+//The plane at which the fireworks stop falling down
+#define FW_LOWEST_FALL_PLANE 0
+
+//fireworks animation falling rockets levels
+//for creating a burnout effect
+#define FW_FALL_LVL3 255
+#define FW_FALL_LVL2 120
+#define FW_FALL_LVL1 50
+#define FW_FALL_LVL0 20
+
+//Max numbers of FW in the FW animation
+#define MAX_NUMBER_OF_FW 5
 
 class Cube{
   private:
@@ -104,15 +121,28 @@ class Cube{
     //Used in gradualSnake animation
     bool nextAnimation = false;
     //Used to dim the displayed leds
-    byte dimLevel = 0;
+    unsigned char dimLevel = 0;
     //Determines how fast the cube is dimmed in sound level modes.
     //Valid values from 1 -50;
     //TODO: make this a setting
-    byte dimSpeed = 10;
+    unsigned char dimSpeed = 1;
     //Sound level to be displayed at the led cube 0 = silence, 4 = max sound level
     byte soundLevel = 0;
     //Determines if the shift registers need to be written to in sound mode 2
     byte sndLvl2Status = SM2_NONE;
+    //keeps track in which step the program is in the fireworks animation
+    unsigned char fireworksStep = 0;
+    //keeps track of which level should currently be dimmed in the fireworks animation
+    unsigned char dimPlaneFW = 0;
+    //holds the led positions which should be lit when the fireworks animation is displayed
+    unsigned int fwExplosionInt = 0;
+    //for creating a burnout effect in the fireworks animation
+    unsigned char burnoutEffectLvl = FW_FALL_LVL1;
+    //Max fade levels for creating a burnout rocket animation for fireworks animation
+    unsigned char fwFallDownLevels[4] = {FW_FALL_LVL0, FW_FALL_LVL1,FW_FALL_LVL2,FW_FALL_LVL3};
+    
+    //debug function
+    void printPlaneBits(int x);
 
     //Takes an int where each bit represents a LED and loads it in the shift registers
     void loadPlane(int);
@@ -137,6 +167,23 @@ class Cube{
     void displaySoundLevel2();
     //TODO:random fireworks shooting up
     void displayFireWorks();
+    /**
+     * helper function for fireworks animation.
+     * Retuns true if dimming finished
+     * plane, the plane which is dimmed down, the above one will be dimmed up
+     * */ 
+    bool dimUp(unsigned char plane);
+        /**
+     * helper function for fireworks animation.
+     * Retuns true if dimming finished
+     * plane, the plane which is dimmed down, the below one will be dimmed up
+     * the leds looose brightnessm the lower they fall
+     * */ 
+    bool dimDown(unsigned char plane);
+    //Generates random fw animation for the displayFireWorks() function to play
+    void generateRandomFw();
+    //will fill the fwExplosionArray with the leds that should be light up for the fireworks animation
+    void fillFwExplosionInt(char startingPoint);
 
 
   public:
