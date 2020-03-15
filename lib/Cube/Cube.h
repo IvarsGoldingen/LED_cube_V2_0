@@ -20,6 +20,9 @@
 #include "Arduino.h"
 //Shift register library
 #include "ShiftRegister.h"
+//Microphone library
+#include "Max9841.h"
+
 //row size of the cube
 #define CUBE_SIZE 4
 //number of LEDs in a plane of the cube
@@ -69,6 +72,17 @@
 //Max numbers of FW in the FW animation
 #define MAX_NUMBER_OF_FW 5
 
+//MODES
+#define OFF_MODE 10
+#define STATIC_PATTERN_MODE 11 // multiplies DisplayTime to get ms - why not =100?
+#define RANDOM_MODE 12
+#define SOUND_MODE1 13
+#define SOUND_MODE2 14
+#define SNAKE_MODE1 15
+#define SNAKE_MODE2 16
+#define FIREWORKS_MODE 17
+#define CUSTOM_PATTERN_MODE 18
+
 class Cube{
   private:
     //Class member variables
@@ -77,6 +91,9 @@ class Cube{
     ShiftRegister* sr1;
     ShiftRegister* sr2;
 
+    //A pointer to the microphone object
+    Max9841* mic;
+
     //Pins for controlling the shift register
     byte ser1P;
     byte rclk1P;
@@ -84,6 +101,10 @@ class Cube{
     byte ser2P;
     byte rclk2P;
     byte srclk2P;
+
+    //Pins for controlling the microphone
+    byte micOutP;
+    byte micGainP;
 
     //pins for controlling the planes
     byte planeP[CUBE_SIZE];
@@ -125,7 +146,7 @@ class Cube{
     //Determines how fast the cube is dimmed in sound level modes.
     //Valid values from 1 -50;
     //TODO: make this a setting
-    unsigned char dimSpeed = 1;
+    unsigned char dimSpeed = 15;
     //Sound level to be displayed at the led cube 0 = silence, 4 = max sound level
     byte soundLevel = 0;
     //Determines if the shift registers need to be written to in sound mode 2
@@ -140,7 +161,10 @@ class Cube{
     unsigned char burnoutEffectLvl = FW_FALL_LVL1;
     //Max fade levels for creating a burnout rocket animation for fireworks animation
     unsigned char fwFallDownLevels[4] = {FW_FALL_LVL0, FW_FALL_LVL1,FW_FALL_LVL2,FW_FALL_LVL3};
-    
+    //The animation currently being displayed
+    byte mode = SOUND_MODE1;
+
+
     //debug function
     void printPlaneBits(int x);
 
@@ -149,6 +173,10 @@ class Cube{
 
     //turns on the next plane and off the previos on the led cube
     void previousPlaneOff(byte planeNumber);
+    //NOT USED because timer1 is used for PWM
+    void setupTimer1Interrupt();
+     //Sets up Timer2 interrupt to adjust how often soudnis read
+    void setupTimer2Interrupt();
 
     //***DISPLAY MODES FUNCTIONS FOR THE CUBE***
     //function that displays a static pattern on the led cube
@@ -184,7 +212,12 @@ class Cube{
     void generateRandomFw();
     //will fill the fwExplosionArray with the leds that should be light up for the fireworks animation
     void fillFwExplosionInt(char startingPoint);
-
+    //the analog microphone pin is read certain number of times per second
+    //this function check if the timer has passed and reads the sound level from the mic
+    //and sets it on the LEDS
+    void checkMic();
+    //set all planes on or off
+    void setAllPlanes(bool);
 
   public:
     /*********************************************************************************
@@ -192,14 +225,33 @@ class Cube{
      * planePins[4] = pins for controlling the 4 horizontal planes of the cube
      * ser1, rclk1, srclk1, ser2, rclk2, srclk2 = Shift register control pins to control
      * the vertical lines of the cube
+     * micOutput, micGain microphone reading and control pins
     *********************************************************************************/
-    Cube(byte planePins[4], byte ser1, byte rclk1, byte srclk1, byte ser2, byte rclk2, byte srclk2);
+    Cube(byte planePins[4],
+      byte ser1, 
+      byte rclk1, 
+      byte srclk1, 
+      byte ser2, 
+      byte rclk2, 
+      byte srclk2,
+      byte micOutput,
+      byte micGain);
 
+    
+    //Function which will be called from the interrup
+    static void Timer2ISR();
     //Setup function of the cube
     void setup();
     //Loop function of the cube
     void loop();
     //Function for setting sound level for visualizer animations
     void setSoundLevel(byte receivedSoundLvl);
+    //Switch to the next animation mode
+    void nextMode();
+    //Sets the next mode
+    void setMode(byte);
+  protected:
+    //Bool that will be updated in the ISR so the program reads the analog input
+    volatile static bool checkSoundLevel;
 };
 #endif

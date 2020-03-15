@@ -4,13 +4,25 @@
 //Hold the pattern for static pattern display
 #include "Big_pattern.h"
 
-Cube::Cube(byte planePins[CUBE_SIZE], byte ser1, byte rclk1, byte srclk1, byte ser2, byte rclk2, byte srclk2){
+
+
+Cube::Cube(byte planePins[CUBE_SIZE], 
+        byte ser1, 
+        byte rclk1, 
+        byte srclk1, 
+        byte ser2, 
+        byte rclk2, 
+        byte srclk2,
+        byte micOutput,
+        byte micGain){
     ser1P = ser1;
     rclk1P = rclk1;
     srclk1P = srclk1;
     ser2P = ser2;
     rclk2P = rclk2;
     srclk2P = srclk2;
+    micOutP = micOutput;
+    micGainP = micGain;
 
     for (int x = 0; x < CUBE_SIZE; x++){
         planeP[x] = planePins[x];
@@ -26,6 +38,13 @@ void Cube::setup(){
     sr1->setup();
     sr2->setup();
 
+    //Initialize a microphone object
+    mic = new Max9841(micOutP, micGainP);
+    //setup the microphone
+    mic->setup();
+    //setup up a timer interrupt 
+    setupTimer2Interrupt();
+    
     //TODO: Initiate LED cube with sound mode and all lights on
     //set up plane pins as outputs (set LOW to turn plane ON)
     for (int x = 0; x < CUBE_SIZE; x++){
@@ -36,19 +55,152 @@ void Cube::setup(){
 
     //TODO: plane must be loaded with 255 when soundLevel function is called
     loadPlane(0xffff);
-    
+}
+
+void Cube::setAllPlanes(bool state){
+    for (int x = 0; x < CUBE_SIZE; x++){
+        //all planes on in the beginning
+        digitalWrite(planeP[x], state);
+    }
+}
+
+/**
+ * NOT USED BECAUSE INTERFIERES WITH PWM = analogWrite
+*/
+void Cube::setupTimer1Interrupt(){
+    TCCR1A = 0;// set entire TCCR1A register to 0
+    TCCR1B = 0;// same for TCCR1B
+    TCNT1  = 0;//initialize counter value to 0
+    // Set CS10 and CS12 bits for 1024 prescaler
+    TCCR1B |= (1 << CS12) | (1 << CS10);
+    // turn on CTC mode, which means interrupt happens when counter == OCR1A
+    TCCR1B |= (1 << WGM12);
+    /**
+     * set compare match register for desired speed
+     * With 1024 prescaler the counter will thick 16*10^6/1024 = 15624 times a second
+     * compare match register = 16MHz/(presc * desired freq)-1
+     * 16MHz/(1024*100Hz)-1 = 155.25
+    */
+    OCR1A = 155;//(must be <65536, because 16 bit timer)
+    // enable timer compare interrupt
+    TIMSK1 |= (1 << OCIE1A);
+}
+
+void Cube::setupTimer2Interrupt(){
+    TCCR2A = 0;// set entire TCCR1A register to 0
+    TCCR2B = 0;// same for TCCR1B
+    TCNT2  = 0;//initialize counter value to 0
+    // turn on CTC mode, which means interrupt happens when counter == OCR2A
+    TCCR2A |= (1 << WGM21);
+    // Set 1024 prescaler
+    TCCR2B |= (1 << CS22) | (1 << CS21)| (1 << CS20);
+    /**
+     * set compare match register for desired speed
+     * With 1024 prescaler the counter will thick 16*10^6/1024 = 15624 times a second
+     * compare match register = 16MHz/(presc * desired freq)-1
+     * 16MHz/(1024*100Hz)-1 = 155.25
+    */
+    OCR2A = 155;//(must be <65536, because 16 bit timer)
+    // enable timer compare interrupt
+    TIMSK2 |= (1 << OCIE2A);
 }
 
 void Cube::loop(){
-    //displayStaticPattern();
-    //displayRandom();
-    //displaySnake();
-    //displayRandomSnakeGradual();
-    //call loadPlane(0xff) before turning on this mode
-    //displaySoundLevel1();
-    //make sndLvl2Status = NONE before turning on this mode
-    //displaySoundLevel2();
-    displayFireWorks();
+    switch (mode) {
+        case STATIC_PATTERN_MODE:
+            displayStaticPattern();
+            //displayRandom();
+            break;
+        case RANDOM_MODE:
+            displayRandom();
+            break;
+        case SOUND_MODE1:
+            displaySoundLevel1();
+            checkMic();
+            break;
+        case SOUND_MODE2:
+            displaySoundLevel2();
+            checkMic();
+            break;
+        case SNAKE_MODE1:
+            displaySnake();
+            break;
+        case SNAKE_MODE2:
+            displayRandomSnakeGradual();
+            break;
+        case FIREWORKS_MODE:
+            displayFireWorks();
+            break;
+        case CUSTOM_PATTERN_MODE:
+            //playReceivedPattern();
+            break;
+        case 0:
+            //do nothing
+            break;
+        default:
+            //displayRandom();
+            displayStaticPattern();
+            break;
+    }
+    
+}
+
+void::Cube::setMode(byte nextMode){
+    //ALL OFF
+    loadPlane(0);
+    setAllPlanes(LOW);
+    mode = nextMode;
+    //Setup variables if neccessary for each mode
+    switch (mode) {
+        case STATIC_PATTERN_MODE:
+            break;
+        case RANDOM_MODE:
+            break;
+        case SOUND_MODE1:
+            loadPlane(0xffff);
+            dimSpeed = 10;
+            break;
+        case SOUND_MODE2:
+            loadPlane(0xffff);
+            dimSpeed = 10;
+            sndLvl2Status = SM2_NONE;
+            break;
+        case SNAKE_MODE1:
+            break;
+        case SNAKE_MODE2:
+            break;
+        case FIREWORKS_MODE:
+            dimSpeed = 1;
+            break;
+        case CUSTOM_PATTERN_MODE:
+            break;
+        case 0:
+            //do nothing
+            break;
+        default:
+            //displayRandom();
+            displayStaticPattern();
+            break;
+    }
+}
+
+void Cube::nextMode(){
+    byte modeToSet = mode + 1;
+    if (modeToSet > FIREWORKS_MODE){
+        modeToSet = OFF_MODE;
+    } else if (modeToSet < OFF_MODE){
+        modeToSet = OFF_MODE;
+    }
+    setMode(modeToSet);    
+}
+
+
+
+void Cube::checkMic(){
+    if (checkSoundLevel){
+        setSoundLevel(mic->getSoundLevel());
+        checkSoundLevel = false;
+    }
 }
 
 //called to display a static pattern on the LED cube
@@ -682,3 +834,24 @@ bool Cube::dimDown(unsigned char plane){
         return false;
     }    
 }
+
+//Interrupt function
+void Cube::Timer2ISR(){
+    //The main program will check the sound level
+    checkSoundLevel = true;
+}
+
+//Interrupt routine
+ISR(TIMER2_COMPA_vect){ 
+    //call the interrupt function so variables can be accessed
+    Cube::Timer2ISR();
+}
+
+//Define the variable which is updated in the interrupt
+volatile bool Cube::checkSoundLevel = false;
+
+
+
+
+
+
