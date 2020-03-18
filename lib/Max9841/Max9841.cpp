@@ -19,15 +19,30 @@ void Max9841::setGain(byte gain){
     if (gain == GAIN_HIGH){
         //the gain pin must be floating for 60dB gain
         pinMode(gainP, INPUT);
+        currentGain = GAIN_HIGH;
     } else if (gain == GAIN_MEDIUM){
         //the gain pin must be LOW for 50dB gain
         pinMode(gainP, OUTPUT);
         digitalWrite(gainP, LOW);
+        currentGain = GAIN_MEDIUM;
     } else if (gain == GAIN_LOW){
         //the gain pin must be HIGH for 40dB gain
         pinMode(gainP, OUTPUT);
         digitalWrite(gainP, HIGH);
+        currentGain = GAIN_LOW;
+    } else {
+        //Unknown gain setting
+        Serial.println("Max9841: Unknown gain setting");
+        currentGain = GAIN_HIGH;
     }
+}
+
+/**
+ * TODO: this woulb be much better if this function would read the state of the pin
+ * instead of having a variable to keep track of.
+*/
+byte Max9841::getMicGain(){
+    return currentGain;
 }
 
 byte Max9841::getSoundLevel(){

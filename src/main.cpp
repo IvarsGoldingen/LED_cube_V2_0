@@ -59,21 +59,14 @@ void loop() {
   btn.loop();
 }
 
+//Receiving of serial port left in main code, but all data handled in the cube
+//object.
 void getCommandFromSerial() {
-  //allways reads the last byte received
   while (Serial.available() > 0) {
-    // read the incoming byte:
+    //Read all the incomming data:
     byte incomingByte = Serial.read();
-    Serial.println(incomingByte);
-    if (incomingByte == '1'){
-      cube.setSoundLevel(1);
-    } else if (incomingByte == '2'){
-      cube.setSoundLevel(2);
-    } else if (incomingByte == '3'){
-      cube.setSoundLevel(3);
-    } else if (incomingByte == '4'){
-      cube.setSoundLevel(4);
-    }
+    //Send data to cube object
+    cube.handleCubeSerialCommands(incomingByte);
   }
 }
 
@@ -85,6 +78,7 @@ void buttonPressed(byte pressType){
     cube.nextMode();
   } else if (pressType == ButtonIB::LONG_PRESS){
     blinkLed(100, 2);
+    cube.toggleMicGain();
   }
   analogWrite(INDICATION_LED_P,10);
 }

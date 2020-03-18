@@ -32,6 +32,9 @@
 #define PLANETIME 3333
 //Short plane time, used for dimming efect in gradualSnake function
 #define PLANETIME_SHORT 250
+//time each plane is displayed in the reeived pattern mode. uS
+#define PLANETIME_REC_PAT 500
+
 
 //multiplies the display time in the big_pater to get ms. Big patter holds
 //bytes, that is why ms can't be saved there dirrectly
@@ -82,6 +85,9 @@
 #define SNAKE_MODE2 16
 #define FIREWORKS_MODE 17
 #define CUSTOM_PATTERN_MODE 18
+
+//Pattern receive max time between bytes  for timeOut
+#define PATTERN_RECEIVE_TO 10000
 
 class Cube{
   private:
@@ -136,7 +142,7 @@ class Cube{
     };
 
     //the index of the big pattern which should currently be read if the big pattern is being displayed
-    int patternIdx;
+    int patternIdx = 0;
 
     //Keeps track if next animation should be read when dimming effects are used.
     //Used in gradualSnake animation
@@ -162,8 +168,13 @@ class Cube{
     //Max fade levels for creating a burnout rocket animation for fireworks animation
     unsigned char fwFallDownLevels[4] = {FW_FALL_LVL0, FW_FALL_LVL1,FW_FALL_LVL2,FW_FALL_LVL3};
     //The animation currently being displayed
-    byte mode = SOUND_MODE1;
-
+    byte mode = STATIC_PATTERN_MODE;
+    //Scene being filled from serial, but not yet displayed
+    unsigned int receivedSceneBuffer[4] = {0, 0, 0, 0};
+    //Scene received from serial and displayed
+    unsigned int receivedScene[4] = {0, 0, 0, 0};
+    //Last time the plane was switched in receivedPatternMode
+    unsigned long receivedPatternRefreshTime = 0;
 
     //debug function
     void printPlaneBits(int x);
@@ -195,6 +206,8 @@ class Cube{
     void displaySoundLevel2();
     //TODO:random fireworks shooting up
     void displayFireWorks();
+    //Play the scene received from serial
+    void displayReceivedPattern();
     /**
      * helper function for fireworks animation.
      * Retuns true if dimming finished
@@ -218,6 +231,10 @@ class Cube{
     void checkMic();
     //set all planes on or off
     void setAllPlanes(bool);
+    //set up dim speed depending on command from serial
+    void setDimSpeedFromSerial(byte serialDimSpeed);
+    //Write the received scene buffer into the actual displayed scene
+    void fillReceivedSceneBuffer();
 
   public:
     /*********************************************************************************
@@ -250,6 +267,10 @@ class Cube{
     void nextMode();
     //Sets the next mode
     void setMode(byte);
+    //Allows changing of gain for the mic board
+    void toggleMicGain();
+    //Handle the commands received from serial port in the cube class
+    void handleCubeSerialCommands(byte data);
   protected:
     //Bool that will be updated in the ISR so the program reads the analog input
     volatile static bool checkSoundLevel;

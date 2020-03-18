@@ -132,13 +132,14 @@ void Cube::loop(){
             displayFireWorks();
             break;
         case CUSTOM_PATTERN_MODE:
-            //playReceivedPattern();
+            displayReceivedPattern();
             break;
-        case 0:
+        case OFF_MODE:
             //do nothing
             break;
         default:
             //displayRandom();
+            Serial.println("Cube: Uknown mode set");
             displayStaticPattern();
             break;
     }
@@ -155,10 +156,12 @@ void::Cube::setMode(byte nextMode){
         case STATIC_PATTERN_MODE:
             break;
         case RANDOM_MODE:
+            //seed the random function before calling this
+            randomSeed(millis());
             break;
         case SOUND_MODE1:
             loadPlane(0xffff);
-            dimSpeed = 10;
+            dimSpeed = 15;
             break;
         case SOUND_MODE2:
             loadPlane(0xffff);
@@ -166,19 +169,29 @@ void::Cube::setMode(byte nextMode){
             sndLvl2Status = SM2_NONE;
             break;
         case SNAKE_MODE1:
+            //seed the random function before calling this
+            randomSeed(millis());
             break;
         case SNAKE_MODE2:
+            //seed the random function before calling this
+            randomSeed(millis());
             break;
         case FIREWORKS_MODE:
+            //seed the random function before calling this
+            randomSeed(millis());
             dimSpeed = 1;
             break;
         case CUSTOM_PATTERN_MODE:
+            //So the pattern gets loaded instantly
+            receivedPatternRefreshTime = 0;
             break;
-        case 0:
+        case OFF_MODE:
+            //turn everything off
+            setAllPlanes(LOW);
+            loadPlane(0);
             //do nothing
             break;
         default:
-            //displayRandom();
             displayStaticPattern();
             break;
     }
@@ -205,8 +218,7 @@ void Cube::checkMic(){
 
 //called to display a static pattern on the LED cube
 void Cube::displayStaticPattern(){
-    //set the beginning of the big pattern
-    patternIdx = 0;
+
     //Static pattern variables
     //Saves LED pattern for a plane from the big pattern
     byte PatternBuf[PLANE_SIZE]; 
@@ -214,55 +226,53 @@ void Cube::displayStaticPattern(){
     byte DisplayTime; // time*100ms to display pattern
     //For controlling when the pattern should be stopeed displaying
     unsigned long EndTime;
-    byte plane; // loop counter for cube refresh
-    int patBufCntr; // indexes which byte from pattern buffer to use
-    int ledRow; // counts LEDs in refresh loop
-    int ledCol; // counts LEDs in refresh loop
-
-    // loop over entries in pattern table. End of table is 0 for displayTime
-    do {
-        //read pattern from PROGMEM and save in array
-        memcpy_P( PatternBuf, PatternTable + patternIdx, PLANE_SIZE );
-        //Chenge the address for the next plane read from the big pattern
-        patternIdx += PLANE_SIZE;
-        //read DisplayTime from PROGMEM and increment index
-        DisplayTime = pgm_read_byte_near( PatternTable + patternIdx++ );
-        //compute EndTime from current time (ms) and DisplayTime
-        EndTime = millis() + (((unsigned long) DisplayTime) * TIMECONST);
-        //loop while current time < EndTime
-        while ( millis() < EndTime )
-        {
-            //Reset the buffer counter
-            patBufCntr = 0; 
-            //Loop over planes
-            for (plane = 0; plane < CUBE_SIZE; plane++){
-                //variable which will be sent to the readLedInt function
-                int planeLedBits = 0;
-                //bit counter for the planeLedBits variabe
-                byte bitCounter = 0;
-                //Go through all the LEDs in a plane
-                //Go through rows
-                for (ledRow = 0; ledRow < CUBE_SIZE; ledRow++){
-                    //Go through columns
-                    for (ledCol = 0; ledCol < CUBE_SIZE; ledCol++){
-                        //Read the patter from the Big pattern and save it in the planeLedBits variable
-                        if ((PatternBuf[patBufCntr] & (1 << ledCol)) > 0){
-                            //set that bit high in the planeLedBits high too
-                            planeLedBits = planeLedBits | 1 << bitCounter;
-                        }
-                        bitCounter++;
+    int patBufCntr; // indexes which byte from pattern buffer to use 
+    //read pattern from PROGMEM and save in array
+    memcpy_P( PatternBuf, PatternTable + patternIdx, PLANE_SIZE );
+    //Chenge the address for the next plane read from the big pattern
+    patternIdx += PLANE_SIZE;
+    //read DisplayTime from PROGMEM and increment index
+    DisplayTime = pgm_read_byte_near( PatternTable + patternIdx++ );
+    //compute EndTime from current time (ms) and DisplayTime
+    EndTime = millis() + (((unsigned long) DisplayTime) * TIMECONST);
+    //loop while current time < EndTime
+    while ( millis() < EndTime )
+    {
+        //Reset the buffer counter
+        patBufCntr = 0; 
+        //Loop over planes
+        for (byte plane = 0; plane < CUBE_SIZE; plane++){
+            //variable which will be sent to the readLedInt function
+            int planeLedBits = 0;
+            //bit counter for the planeLedBits variabe
+            byte bitCounter = 0;
+            //Go through all the LEDs in a plane
+            //Go through rows
+            for (byte ledRow = 0; ledRow < CUBE_SIZE; ledRow++){
+                //Go through columns
+                for (byte ledCol = 0; ledCol < CUBE_SIZE; ledCol++){
+                    //Read the patter from the Big pattern and save it in the planeLedBits variable
+                    if ((PatternBuf[patBufCntr] & (1 << ledCol)) > 0){
+                        //set that bit high in the planeLedBits high too
+                        planeLedBits = planeLedBits | 1 << bitCounter;
                     }
-                    //a byte in the pattern buffer hold value for 4 LEDs in a plane
-                    patBufCntr++;
+                    bitCounter++;
                 }
-                previousPlaneOff(plane);
-                loadPlane(planeLedBits);
-                //turn current plane on
-                digitalWrite( planeP[plane], HIGH );
-                delayMicroseconds( PLANETIME );
-            } // for plane
-        } // while <EndTime
-    } while (DisplayTime > 0); // read patterns until time=0 which signals end
+                //a byte in the pattern buffer hold value for 4 LEDs in a plane
+                patBufCntr++;
+            }
+            previousPlaneOff(plane);
+            loadPlane(planeLedBits);
+            //turn current plane on
+            digitalWrite( planeP[plane], HIGH );
+            delayMicroseconds( PLANETIME );
+        } // for plane
+    } // while <EndTime
+    if (DisplayTime == 0){
+        //set the beginning of the big pattern
+        patternIdx = 0;
+    }
+    
 }
 
 void Cube::loadPlane(int leds){
@@ -850,6 +860,153 @@ ISR(TIMER2_COMPA_vect){
 //Define the variable which is updated in the interrupt
 volatile bool Cube::checkSoundLevel = false;
 
+void Cube::toggleMicGain(){
+    byte gainToSet = mic->getMicGain() + 1;
+    if (gainToSet > Max9841::GAIN_HIGH){
+        gainToSet = Max9841::GAIN_LOW;
+    }
+    //Message through the serial which gain is set
+    switch (gainToSet)
+    {
+    case Max9841::GAIN_LOW:
+        Serial.println("Low mic gain set");
+        break;
+    case Max9841::GAIN_MEDIUM:
+        Serial.println("Medium mic gain set");
+        break;
+    case Max9841::GAIN_HIGH:
+        Serial.println("High mic gain set");
+        break;
+    default:
+        //error handled in mic library
+        break;
+    }
+    mic->setGain(gainToSet);
+}
+
+void Cube::handleCubeSerialCommands(byte data){
+    //IF we are waiting for a pattern from serial this is true
+    static bool waitForPattern = false;
+    //Time when the last pattern byte was received. Checked for controlling time out
+    static unsigned long patternReceiveTime = 0;
+    //Pattern bytes received
+    static byte bytesReceived = 0;
+
+    if (waitForPattern){
+        //In case waiting for pattern, first check if there has not been a time out
+        if (millis() - patternReceiveTime > PATTERN_RECEIVE_TO) {
+            //so program does not get stuck waiting for pattern
+            Serial.println("Cube:Pattern receive TO");//for time out
+            waitForPattern = false;
+            bytesReceived = 0;
+        }
+    }
+
+    if (waitForPattern) {
+        //Waiting for pattern, all data considdered to be pattern data, not other commands
+        //The plane the byte is meant for
+        byte planeToWriteIn = bytesReceived / 2;
+        if (bytesReceived % 2 == 0) {
+            //If no remainder then it is the most sign bits
+            //Save data in the received pattern array 
+            receivedSceneBuffer[planeToWriteIn] |= data << 8;
+        } else {
+            ////Save data in the received pattern array - least significant bits
+            receivedSceneBuffer[planeToWriteIn] |= data;
+        }
+        bytesReceived++;
+        if (bytesReceived >= 8) {
+            fillReceivedSceneBuffer();
+            //The current scene has been received
+            waitForPattern = false;
+        }
+        patternReceiveTime = millis();
+    } else {
+      //if not waiting for the pattern byte read commands
+        if (data < 5) {
+            //simulate sound levels when commmands from 0-4 decimal
+            setSoundLevel(data);
+        } else if (data < 20) {
+            Serial.print("Cube:Mode from serial: ");
+            Serial.println(data);
+            setMode(data);
+            if (mode == CUSTOM_PATTERN_MODE) {
+                Serial.println("Cube: receiving pattern");
+                patternReceiveTime = millis();
+                waitForPattern = true;
+                bytesReceived = 0;
+            }
+        } else if (data < 40) {
+                Serial.println("Cube: Setting dim speed" + data);
+                //Dim speed changed from serial
+                setDimSpeedFromSerial(data);
+        } else if (data <= '4'){
+            //simulate sound levels when commmands from 0-4 in Ascii symbols
+            //'4' is nr 52 in Ascii table
+            setSoundLevel(data - 48);
+            //}
+        } else {
+            Serial.println("Cube: Unknown message");
+            setMode(SNAKE_MODE2);
+        }
+    }
+}
+
+void Cube::fillReceivedSceneBuffer(){
+    //Read data from the buffer in to the actual scene and set to 0 for next receiving
+    for (byte i = 0; i < 4; i++){
+        receivedScene[i] = receivedSceneBuffer[i];
+        receivedSceneBuffer[i] = 0;
+    }
+}
+
+void Cube::setDimSpeedFromSerial(byte serialDimSpeed){
+    switch (serialDimSpeed) {
+        case 31:
+        dimSpeed = 1;
+        break;
+        case 32:
+        dimSpeed = 2;
+        break;
+        case 33:
+        dimSpeed = 5;
+        break;
+        case 34:
+        dimSpeed = 10;
+        break;
+        case 35:
+        dimSpeed = 15;
+        break;
+        case 36:
+        dimSpeed = 20;
+        break;
+        case 37:
+        dimSpeed = 25;
+        break;
+        case 38:
+        dimSpeed = 30;
+        break;
+        default:
+        Serial.print("Cube: Error setting dim speed");
+        break;
+    }
+}
+
+void Cube::displayReceivedPattern(){
+    //Plane counter for this function
+    static byte recPatCounter = 0;
+    if (micros() - receivedPatternRefreshTime > PLANETIME_REC_PAT) {
+        //Set the relevant scene in the current plane
+        previousPlaneOff(recPatCounter);
+        loadPlane(receivedScene[recPatCounter]);
+        digitalWrite(planeP[recPatCounter], HIGH );
+        recPatCounter++;
+        if (recPatCounter > 3) {
+            recPatCounter = 0;
+        }
+        receivedPatternRefreshTime = micros();
+    }
+}
 
 
 
