@@ -77,7 +77,7 @@
 
 //MODES
 #define OFF_MODE 10
-#define STATIC_PATTERN_MODE 11 // multiplies DisplayTime to get ms - why not =100?
+#define STATIC_PATTERN_MODE 11
 #define RANDOM_MODE 12
 #define SOUND_MODE1 13
 #define SOUND_MODE2 14
@@ -236,6 +236,7 @@ class Cube{
     //Write the received scene buffer into the actual displayed scene
     void fillReceivedSceneBuffer();
 
+
   public:
     /*********************************************************************************
      * A constructor for the class
@@ -271,6 +272,8 @@ class Cube{
     void toggleMicGain();
     //Handle the commands received from serial port in the cube class
     void handleCubeSerialCommands(byte data);
+    //When cube starts up
+    void set_random_non_sound_mode();
   protected:
     //Bool that will be updated in the ISR so the program reads the analog input
     volatile static bool checkSoundLevel;

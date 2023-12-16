@@ -54,7 +54,7 @@ void Cube::setup(){
     }
 
     //TODO: plane must be loaded with 255 when soundLevel function is called
-    loadPlane(0xffff);
+    //loadPlane(0xffff);
 }
 
 void Cube::setAllPlanes(bool state){
@@ -144,6 +144,31 @@ void Cube::loop(){
             break;
     }
     
+}
+
+void::Cube::set_random_non_sound_mode(){
+    // get a random number from 0 to 5 representing one of the none sound related modes and set it
+    int mode_to_set = random(5);
+    switch (mode_to_set) {
+        case 0:
+            setMode(STATIC_PATTERN_MODE);
+            break;
+        case 1:
+            setMode(RANDOM_MODE);
+            break;
+        case 2:
+            setMode(SNAKE_MODE1);
+            break;
+        case 3:
+            setMode(SNAKE_MODE2);
+            break;
+        case 4:
+            setMode(FIREWORKS_MODE);
+            break;
+        default:
+            break;
+    }
+
 }
 
 void::Cube::setMode(byte nextMode){

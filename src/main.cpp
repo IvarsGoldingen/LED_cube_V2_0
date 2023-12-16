@@ -40,6 +40,8 @@ Cube cube(planePins,
 ButtonIB btn(BUTTON_P, *buttonPressed);
 
 void setup() {
+  //Delay because of random startup problems
+  delay(2000);
   //setup serial communication
   Serial.begin(57600);
   Serial.println("CUBE V2.0 START");
@@ -47,6 +49,7 @@ void setup() {
   cube.setup();
   //seed the random function from an unconnected analog read pin
   randomSeed(analogRead(A1));
+  cube.set_random_non_sound_mode();
   //Have the indication light be slightly when the cube is on
   pinMode(INDICATION_LED_P, OUTPUT);
   analogWrite(INDICATION_LED_P,10);
